@@ -3,7 +3,7 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Ensure backend directory is in sys.path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -19,11 +19,17 @@ from database import (
     get_last_7_days,
     init_db,
 )
+from model import predict_tomorrow_proba
+from train import retrain_with_real_checkins, train_model
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    model_path = Path(__file__).resolve().parent / "model.joblib"
+    if not model_path.exists():
+        print("model.joblib missing, training model automatically...")
+        train_model()
     yield
 
 
@@ -59,6 +65,8 @@ class HabitResponse(BaseModel):
     created_at: str
     current_streak: int
     last_7_days: List[CheckinDay]
+    predicted_probability: Optional[float] = None
+    learning: bool = False
 
 
 class CheckinToggleResponse(BaseModel):
@@ -67,6 +75,8 @@ class CheckinToggleResponse(BaseModel):
     done: bool
     current_streak: int
     last_7_days: List[CheckinDay]
+    predicted_probability: Optional[float] = None
+    learning: bool = False
 
 
 @app.post("/habits", response_model=HabitResponse, status_code=status.HTTP_201_CREATED)
@@ -98,6 +108,8 @@ def create_habit(habit_in: HabitCreate):
         created_at=created_at,
         current_streak=0,
         last_7_days=get_last_7_days(empty_checkins, today),
+        predicted_probability=None,
+        learning=True,
     )
 
 
@@ -123,6 +135,18 @@ def get_habits():
         streak = calculate_streak(checkin_map, today)
         last_7 = get_last_7_days(checkin_map, today)
 
+        # If a habit has fewer than 3 days of history, set learning: true
+        if len(checkin_rows) < 3:
+            learning = True
+            predicted_prob = None
+        else:
+            learning = False
+            try:
+                predicted_prob = round(predict_tomorrow_proba(checkin_map, today), 4)
+            except Exception as e:
+                print(f"Prediction error for habit {habit_id}: {e}")
+                predicted_prob = None
+
         result.append(
             HabitResponse(
                 id=habit_id,
@@ -130,6 +154,8 @@ def get_habits():
                 created_at=habit["created_at"],
                 current_streak=streak,
                 last_7_days=last_7,
+                predicted_probability=predicted_prob,
+                learning=learning,
             )
         )
 
@@ -208,6 +234,16 @@ def toggle_checkin(habit_id: int):
     current_streak = calculate_streak(checkin_map, today)
     last_7 = get_last_7_days(checkin_map, today)
 
+    if len(all_checkins) < 3:
+        learning = True
+        predicted_prob = None
+    else:
+        learning = False
+        try:
+            predicted_prob = round(predict_tomorrow_proba(checkin_map, today), 4)
+        except Exception:
+            predicted_prob = None
+
     conn.close()
 
     return CheckinToggleResponse(
@@ -216,10 +252,17 @@ def toggle_checkin(habit_id: int):
         done=bool(new_done),
         current_streak=current_streak,
         last_7_days=last_7,
+        predicted_probability=predicted_prob,
+        learning=learning,
     )
+
+
+@app.post("/retrain")
+def retrain():
+    result = retrain_with_real_checkins()
+    return {"message": "Model retrained successfully", **result}
 
 
 # Serve frontend static files
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-

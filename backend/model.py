@@ -22,9 +22,8 @@ def load_model():
     if _MODEL_CACHE is None:
         model_path = Path(__file__).resolve().parent / "model.joblib"
         if not model_path.exists():
-            raise FileNotFoundError(
-                f"Trained model not found at {model_path}. Please run train.py first."
-            )
+            from train import train_model
+            train_model()
         _MODEL_CACHE = joblib.load(model_path)
     return _MODEL_CACHE
 

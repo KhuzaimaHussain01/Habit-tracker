@@ -4,6 +4,7 @@ const summaryEl = document.getElementById("summary");
 const habitsListEl = document.getElementById("habits-list");
 const addHabitForm = document.getElementById("add-habit-form");
 const habitInput = document.getElementById("habit-input");
+const retrainBtn = document.getElementById("retrain-btn");
 
 async function fetchHabits() {
   try {
@@ -24,7 +25,6 @@ function updateSummary(habits) {
     return;
   }
 
-  // Count habits completed today (the last day in last_7_days represents today)
   let doneTodayCount = 0;
   let bestStreak = 0;
 
@@ -91,9 +91,33 @@ function renderHabits(habits) {
     leftDiv.appendChild(doneBtn);
     leftDiv.appendChild(detailsDiv);
 
-    // Right section: Current Streak + Delete button
+    // Right section: Tomorrow's chance badge + Current Streak + Delete button
     const rightDiv = document.createElement("div");
     rightDiv.className = "habit-right";
+
+    // Tomorrow's chance badge
+    const badgeEl = document.createElement("span");
+    badgeEl.className = "chance-badge";
+
+    if (habit.learning) {
+      badgeEl.classList.add("badge-learning");
+      badgeEl.textContent = "Learning...";
+      badgeEl.title = "Fewer than 3 days of history";
+    } else if (habit.predicted_probability !== null && habit.predicted_probability !== undefined) {
+      const pct = Math.round(habit.predicted_probability * 100);
+      if (pct >= 70) {
+        badgeEl.classList.add("badge-green");
+      } else if (pct >= 40) {
+        badgeEl.classList.add("badge-amber");
+      } else {
+        badgeEl.classList.add("badge-red");
+      }
+      badgeEl.textContent = `${pct}% tomorrow`;
+      badgeEl.title = `Tomorrow's chance: ${pct}%`;
+    } else {
+      badgeEl.classList.add("badge-learning");
+      badgeEl.textContent = "Learning...";
+    }
 
     const streakEl = document.createElement("span");
     streakEl.className = "streak-text";
@@ -107,6 +131,7 @@ function renderHabits(habits) {
     deleteBtn.setAttribute("aria-label", `Delete habit ${habit.name}`);
     deleteBtn.addEventListener("click", () => handleDeleteHabit(habit.id));
 
+    rightDiv.appendChild(badgeEl);
     rightDiv.appendChild(streakEl);
     rightDiv.appendChild(deleteBtn);
 
@@ -166,5 +191,33 @@ async function handleDeleteHabit(habitId) {
   }
 }
 
+async function handleRetrain() {
+  if (!retrainBtn) return;
+  retrainBtn.disabled = true;
+  const originalText = retrainBtn.textContent;
+  retrainBtn.textContent = "Retraining...";
+
+  try {
+    const res = await fetch(`${API_BASE}/retrain`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to retrain model");
+    await loadHabits();
+    retrainBtn.textContent = "Retrained!";
+    setTimeout(() => {
+      retrainBtn.disabled = false;
+      retrainBtn.textContent = originalText;
+    }, 1500);
+  } catch (err) {
+    console.error("Error retraining:", err);
+    retrainBtn.textContent = "Error";
+    setTimeout(() => {
+      retrainBtn.disabled = false;
+      retrainBtn.textContent = originalText;
+    }, 1500);
+  }
+}
+
 addHabitForm.addEventListener("submit", handleAddHabit);
+if (retrainBtn) {
+  retrainBtn.addEventListener("click", handleRetrain);
+}
 document.addEventListener("DOMContentLoaded", loadHabits);
