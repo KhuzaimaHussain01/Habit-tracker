@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+
+# Database
+*.db
+
+# Machine learning model
+model.joblib
