@@ -2,6 +2,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 # Ensure backend directory is in sys.path
@@ -9,6 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from database import (
@@ -65,11 +67,6 @@ class CheckinToggleResponse(BaseModel):
     done: bool
     current_streak: int
     last_7_days: List[CheckinDay]
-
-
-@app.get("/")
-def root():
-    return {"message": "Habit Tracker API is running"}
 
 
 @app.post("/habits", response_model=HabitResponse, status_code=status.HTTP_201_CREATED)
@@ -220,3 +217,9 @@ def toggle_checkin(habit_id: int):
         current_streak=current_streak,
         last_7_days=last_7,
     )
+
+
+# Serve frontend static files
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
