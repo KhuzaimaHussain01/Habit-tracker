@@ -3,25 +3,16 @@
   "functions": {
     "api/index.py": {
       "runtime": "@vercel/python",
-      "includeFiles": "backend/**,data/**,frontend/**"
+      "includeFiles": "backend/**,data/**,public/**"
     }
   },
   "rewrites": [
-    {
-      "source": "/habits/:path*",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/habits",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/retrain",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
-    }
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/habits/:path*", "destination": "/api/index.py" },
+    { "source": "/habits", "destination": "/api/index.py" },
+    { "source": "/retrain", "destination": "/api/index.py" },
+    { "source": "/docs", "destination": "/api/index.py" },
+    { "source": "/openapi.json", "destination": "/api/index.py" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
