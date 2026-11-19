@@ -1,3 +1,4 @@
+import os
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -16,15 +17,37 @@ FEATURE_COLUMNS = [
 
 _MODEL_CACHE = None
 
+# Default probability returned when the model is unavailable
+DEFAULT_PROBABILITY = 0.5
+
+
+def get_model_path() -> Path:
+    if os.getenv("VERCEL"):
+        return Path("/tmp/model.joblib")
+    return Path(__file__).resolve().parent / "model.joblib"
+
 
 def load_model():
+    """
+    Lazily loads the model. If model.joblib is missing, attempts to train
+    from data/habit_history.csv. Returns None if training also fails.
+    """
     global _MODEL_CACHE
     if _MODEL_CACHE is None:
-        model_path = Path(__file__).resolve().parent / "model.joblib"
+        model_path = get_model_path()
         if not model_path.exists():
-            from train import train_model
-            train_model()
-        _MODEL_CACHE = joblib.load(model_path)
+            try:
+                from train import train_model
+                print("model.joblib missing, training model automatically...")
+                train_model()
+            except Exception as e:
+                print(f"[WARN] Could not train model: {e}. Using default probability.")
+                return None
+        try:
+            _MODEL_CACHE = joblib.load(model_path)
+        except Exception as e:
+            print(f"[WARN] Could not load model: {e}. Using default probability.")
+            return None
     return _MODEL_CACHE
 
 
@@ -56,8 +79,6 @@ def build_features_from_history(
             streak_length += 1
             current_date -= timedelta(days=1)
     else:
-        # If today is not completed yet, check if yesterday was done
-        # Streak as of today's completed days: 0 if today is not done
         streak_length = 0
 
     # 2. completion_rate_7d (last 7 days ending today)
@@ -111,16 +132,20 @@ def predict_tomorrow_proba(
     today: Optional[date] = None,
 ) -> float:
     """
-    Given a habit's check-in history (either dict of date->done, or list of dicts with 'date' and 'done'),
-    extracts features and returns the model's predicted probability of completion tomorrow.
+    Given a habit's check-in history, extracts features and returns the
+    model's predicted probability of completion tomorrow. Falls back to
+    DEFAULT_PROBABILITY if the model is unavailable.
     """
     if isinstance(checkin_history, list):
         checkin_map = {item["date"]: bool(item["done"]) for item in checkin_history}
     else:
         checkin_map = {k: bool(v) for k, v in checkin_history.items()}
 
-    features_df = build_features_from_history(checkin_map, today=today)
     model = load_model()
+    if model is None:
+        return DEFAULT_PROBABILITY
+
+    features_df = build_features_from_history(checkin_map, today=today)
 
     # predict_proba returns [[P(miss), P(done)]]
     probabilities = model.predict_proba(features_df)
@@ -135,8 +160,8 @@ def predict_for_habit_id(habit_id: int, today: Optional[date] = None) -> float:
     and predicts tomorrow's completion probability.
     """
     import sqlite3
-    db_path = Path(__file__).resolve().parent / "habits.db"
-    conn = sqlite3.connect(db_path)
+    from database import DB_PATH
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 

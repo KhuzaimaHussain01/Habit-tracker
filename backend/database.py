@@ -1,9 +1,17 @@
+import os
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DB_PATH = Path(__file__).resolve().parent / "habits.db"
+
+def _get_db_path() -> Path:
+    if os.getenv("VERCEL"):
+        return Path("/tmp/habits.db")
+    return Path(__file__).resolve().parent / "habits.db"
+
+
+DB_PATH = _get_db_path()
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -40,7 +48,7 @@ def init_db() -> None:
         """
     )
 
-    # Check if first run (habits table is empty)
+    # Always seed if the habits table is empty (covers fresh /tmp on Vercel)
     cursor.execute("SELECT COUNT(*) as count FROM habits;")
     count = cursor.fetchone()["count"]
 

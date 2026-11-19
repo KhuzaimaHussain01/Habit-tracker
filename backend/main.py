@@ -23,13 +23,23 @@ from model import predict_tomorrow_proba
 from train import retrain_with_real_checkins, train_model
 
 
+def _find_frontend_dir() -> Optional[Path]:
+    """Check candidate paths in order and return the first that exists."""
+    candidates = [
+        Path(__file__).resolve().parent / "frontend",
+        Path(__file__).resolve().parent.parent / "frontend",
+        Path.cwd() / "frontend",
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    model_path = Path(__file__).resolve().parent / "model.joblib"
-    if not model_path.exists():
-        print("model.joblib missing, training model automatically...")
-        train_model()
+    # Lazy model load — don't block startup; model.py handles fallback
     yield
 
 
@@ -263,6 +273,9 @@ def retrain():
     return {"message": "Model retrained successfully", **result}
 
 
-# Serve frontend static files
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+# Serve frontend static files — only if the directory exists
+FRONTEND_DIR = _find_frontend_dir()
+if FRONTEND_DIR is not None:
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+else:
+    print(f"[WARN] Frontend directory not found, skipping static file mount.")

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import joblib
 import pandas as pd
@@ -28,15 +29,16 @@ def train_model():
     backend_dir = Path(__file__).resolve().parent
     root_dir = backend_dir.parent
 
-    # Locate dataset
-    data_path = root_dir / "data" / "habit_history.csv"
-    if not data_path.exists():
-        data_path = backend_dir / "data" / "habit_history.csv"
-
-    if not data_path.exists():
-        raise FileNotFoundError(
-            f"Dataset not found at {data_path}. Please run generate_data.py first."
-        )
+    # Locate dataset with robust fallback for Vercel deployments
+    candidates = [
+        root_dir / "data" / "habit_history.csv",
+        backend_dir / "data" / "habit_history.csv",
+        Path.cwd() / "data" / "habit_history.csv",
+        Path("/var/task") / "data" / "habit_history.csv",
+    ]
+    data_path = next((p for p in candidates if p.exists()), None)
+    if data_path is None:
+        raise FileNotFoundError("Dataset not found in any expected location. Please run generate_data.py first.")
 
     print(f"Loading dataset from: {data_path}")
     df = pd.read_csv(data_path)
@@ -74,8 +76,8 @@ def train_model():
     print(f"ROC-AUC:   {auc:.4f}")
     print("------------------------------------------\n")
 
-    # Save trained model to backend/model.joblib
-    model_path = backend_dir / "model.joblib"
+    # Save trained model to backend/model.joblib (or /tmp on Vercel)
+    model_path = Path("/tmp/model.joblib") if os.getenv("VERCEL") else backend_dir / "model.joblib"
     joblib.dump(pipeline, model_path)
     print(f"Model saved to: {model_path}")
 
@@ -99,18 +101,21 @@ def retrain_with_real_checkins():
     backend_dir = Path(__file__).resolve().parent
     root_dir = backend_dir.parent
 
-    # Locate base CSV dataset
-    data_path = root_dir / "data" / "habit_history.csv"
-    if not data_path.exists():
-        data_path = backend_dir / "data" / "habit_history.csv"
-
-    if not data_path.exists():
-        raise FileNotFoundError(f"Base dataset not found at {data_path}.")
+    # Locate base CSV dataset with robust fallback for Vercel deployments
+    candidates_base = [
+        root_dir / "data" / "habit_history.csv",
+        backend_dir / "data" / "habit_history.csv",
+        Path.cwd() / "data" / "habit_history.csv",
+        Path("/var/task") / "data" / "habit_history.csv",
+    ]
+    data_path = next((p for p in candidates_base if p.exists()), None)
+    if data_path is None:
+        raise FileNotFoundError("Base dataset not found in any expected location.")
 
     df_base = pd.read_csv(data_path)
 
     # Query real checkins from SQLite database
-    db_path = backend_dir / "habits.db"
+    db_path = Path("/tmp/habits.db") if os.getenv("VERCEL") else backend_dir / "habits.db"
     real_rows = []
 
     if db_path.exists():
@@ -224,7 +229,7 @@ def retrain_with_real_checkins():
     rec = float(recall_score(y_test, y_pred))
     auc = float(roc_auc_score(y_test, y_proba))
 
-    model_path = backend_dir / "model.joblib"
+    model_path = Path("/tmp/model.joblib") if os.getenv("VERCEL") else backend_dir / "model.joblib"
     joblib.dump(pipeline, model_path)
     print(f"Retrained model saved to: {model_path}")
 

@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python",
+      "includeFiles": "backend/**,data/**,frontend/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/habits/:path*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/habits",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/retrain",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/$1"
+    }
+  ]
+}
