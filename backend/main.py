@@ -23,8 +23,18 @@ from model import predict_tomorrow_proba
 from train import retrain_with_real_checkins, train_model
 
 
-def _find_frontend_dir() -> Optional[Path]:
-    """Check candidate paths in order and return the first that exists."""
+def _find_static_dir() -> Optional[Path]:
+    """Return the directory to serve static files.
+    During local development we serve from the 'public' folder.
+    On Vercel the static assets are served by Vercel itself, so we return None.
+    """
+    if os.getenv("VERCEL"):
+        return None
+    # Local development: prefer 'public' folder at project root
+    public_dir = Path.cwd() / "public"
+    if public_dir.is_dir():
+        return public_dir
+    # Fallback to legacy 'frontend' locations (kept for compatibility)
     candidates = [
         Path(__file__).resolve().parent / "frontend",
         Path(__file__).resolve().parent.parent / "frontend",
@@ -274,8 +284,8 @@ def retrain():
 
 
 # Serve frontend static files — only if the directory exists
-FRONTEND_DIR = _find_frontend_dir()
-if FRONTEND_DIR is not None:
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+STATIC_DIR = _find_static_dir()
+if STATIC_DIR is not None:
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="frontend")
 else:
-    print(f"[WARN] Frontend directory not found, skipping static file mount.")
+    print(f"[WARN] Static directory not found, skipping static file mount.")
