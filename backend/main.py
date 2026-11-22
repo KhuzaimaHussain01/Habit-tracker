@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -19,8 +20,16 @@ from database import (
     get_last_7_days,
     init_db,
 )
-from model import predict_tomorrow_proba
-from train import retrain_with_real_checkins, train_model
+try:
+    from model import predict_tomorrow_proba
+except Exception:
+    predict_tomorrow_proba = None  # Fallback if model dependencies missing
+
+try:
+    from train import retrain_with_real_checkins, train_model
+except Exception:
+    retrain_with_real_checkins = None
+    train_model = None  # Fallback if training dependencies missing
 
 
 def _find_static_dir() -> Optional[Path]:
@@ -60,7 +69,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS
+# Helper to locate static files in various possible locations
+def _static_file_path(filename: str) -> Path:
+    """Return the Path to a static file inside the public folder.
+    Checks several locations to work both locally and in the Vercel runtime.
+    """
+    candidates = [
+        Path(__file__).resolve().parent / "public" / filename,
+        Path(__file__).resolve().parent.parent / "public" / filename,
+        Path.cwd() / "public" / filename,
+    ]
+    for cand in candidates:
+        if cand.is_file():
+            return cand
+    raise FileNotFoundError(f"Static file {filename} not found")
+
+# Serve the main HTML page
+@app.get("/", response_class=FileResponse)
+def serve_index():
+    return FileResponse(_static_file_path("index.html"), media_type="text/html")
+
+# Serve CSS
+@app.get("/style.css", response_class=FileResponse)
+def serve_css():
+    return FileResponse(_static_file_path("style.css"), media_type="text/css")
+
+# Serve JS
+@app.get("/app.js", response_class=FileResponse)
+def serve_js():
+    return FileResponse(_static_file_path("app.js"), media_type="application/javascript")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
