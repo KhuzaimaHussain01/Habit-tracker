@@ -6,14 +6,11 @@
       "includeFiles": "backend/**,data/**,public/**"
     }
   },
-    "rewrites": [
-    { "source": "/", "destination": "/public/index.html" },
+  "rewrites": [
     { "source": "/habits/:path*", "destination": "/api/index.py" },
     { "source": "/habits", "destination": "/api/index.py" },
     { "source": "/retrain", "destination": "/api/index.py" },
     { "source": "/docs", "destination": "/api/index.py" },
-    { "source": "/openapi.json", "destination": "/api/index.py" },
-    { "source": "/(.*)", "destination": "/public/$1" }
-  ]
+    { "source": "/openapi.json", "destination": "/api/index.py" }
   ]
 }

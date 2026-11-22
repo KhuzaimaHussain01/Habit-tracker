@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Habit Tracker</h1>
+      <button id="retrain-btn" class="retrain-btn" type="button">Retrain</button>
+    </header>
+
+    <div id="summary" class="summary">
+      Loading habits...
+    </div>
+
+    <form id="add-habit-form" class="add-habit-row">
+      <input
+        type="text"
+        id="habit-input"
+        placeholder="Add a new habit..."
+        autocomplete="off"
+        required
+      >
+      <button type="submit" id="add-btn">Add</button>
+    </form>
+
+    <main id="habits-list" class="habits-list">
+      <!-- Habit cards will be dynamically rendered here -->
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
